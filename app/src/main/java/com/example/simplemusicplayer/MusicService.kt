@@ -1,4 +1,4 @@
-package com.example.simplemusicplayer_lab7
+package com.example.simplemusicplayer
 
 import android.app.Notification
 import android.app.NotificationChannel
@@ -19,6 +19,8 @@ class MusicService : Service() {
 
     var loopMode = 0
 
+    var onSongChangedListener: (() -> Unit)? = null
+
     private val binder = MusicBinder()
 
     inner class MusicBinder : Binder() {
@@ -32,7 +34,7 @@ class MusicService : Service() {
     override fun onCreate() {
         super.onCreate()
         createNotificationChannel()
-        val notification = createNotification("Музыкальный плеер готов")
+        val notification = createNotification(getString(R.string.notification_ready))
         startForeground(1, notification)
     }
 
@@ -61,7 +63,11 @@ class MusicService : Service() {
             }
         }
 
-        val notif = createNotification("Играет: ${song.title}")
+        onSongChangedListener?.invoke()
+
+        val notifText = getString(R.string.notification_playing_template, song.title)
+        val notif = createNotification(notifText)
+
         val manager = getSystemService(NotificationManager::class.java)
         manager.notify(1, notif)
     }
@@ -77,6 +83,7 @@ class MusicService : Service() {
     fun playPause() {
         mediaPlayer?.let {
             if (it.isPlaying) it.pause() else it.start()
+            onSongChangedListener?.invoke()
         }
     }
 
@@ -94,13 +101,14 @@ class MusicService : Service() {
         if (currentSongIndex != -1 && currentSongIndex < songs.size) {
             return songs[currentSongIndex].title
         }
-        return "Выберите песню"
+        return getString(R.string.select_song)
     }
 
     private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val name = getString(R.string.channel_name)
             val channel = NotificationChannel(
-                "music_channel", "Music Playback",
+                "music_channel", name,
                 NotificationManager.IMPORTANCE_LOW
             )
             val manager = getSystemService(NotificationManager::class.java)
@@ -109,8 +117,9 @@ class MusicService : Service() {
     }
 
     private fun createNotification(text: String): Notification {
+        val title = getString(R.string.notification_title)
         return NotificationCompat.Builder(this, "music_channel")
-            .setContentTitle("Лабораторная №7")
+            .setContentTitle(title)
             .setContentText(text)
             .setSmallIcon(android.R.drawable.ic_media_play)
             .build()
