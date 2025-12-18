@@ -4,11 +4,15 @@ import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.Service
+import android.content.BroadcastReceiver
+import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.media.MediaPlayer
 import android.os.Binder
 import android.os.Build
 import android.os.IBinder
+import android.telephony.TelephonyManager
 import androidx.core.app.NotificationCompat
 
 class MusicService : Service() {
@@ -16,12 +20,34 @@ class MusicService : Service() {
     private var mediaPlayer: MediaPlayer? = null
     private var songs: ArrayList<Song> = ArrayList()
     private var currentSongIndex = -1
-
     var loopMode = 0
-
     var onSongChangedListener: (() -> Unit)? = null
 
+    private var wasPlayingBeforeCall = false
+
     private val binder = MusicBinder()
+
+    private val phoneStateReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            val state = intent?.getStringExtra(TelephonyManager.EXTRA_STATE)
+
+            when (state) {
+                TelephonyManager.EXTRA_STATE_RINGING, TelephonyManager.EXTRA_STATE_OFFHOOK -> {
+                    if (isPlaying()) {
+                        playPause()
+                        wasPlayingBeforeCall = true
+                    }
+                }
+
+                TelephonyManager.EXTRA_STATE_IDLE -> {
+                    if (wasPlayingBeforeCall) {
+                        playPause()
+                        wasPlayingBeforeCall = false
+                    }
+                }
+            }
+        }
+    }
 
     inner class MusicBinder : Binder() {
         fun getService(): MusicService = this@MusicService
@@ -36,6 +62,9 @@ class MusicService : Service() {
         createNotificationChannel()
         val notification = createNotification(getString(R.string.notification_ready))
         startForeground(1, notification)
+
+        val filter = IntentFilter(TelephonyManager.ACTION_PHONE_STATE_CHANGED)
+        registerReceiver(phoneStateReceiver, filter)
     }
 
     fun setSongList(songList: ArrayList<Song>) {
@@ -128,5 +157,7 @@ class MusicService : Service() {
     override fun onDestroy() {
         super.onDestroy()
         mediaPlayer?.release()
+
+        unregisterReceiver(phoneStateReceiver)
     }
 }

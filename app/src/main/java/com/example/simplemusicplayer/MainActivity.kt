@@ -86,14 +86,23 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun checkPermissions() {
-        val permission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            Manifest.permission.READ_MEDIA_AUDIO
+        val permissions = mutableListOf<String>()
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            permissions.add(Manifest.permission.READ_MEDIA_AUDIO)
+            permissions.add(Manifest.permission.POST_NOTIFICATIONS)
         } else {
-            Manifest.permission.READ_EXTERNAL_STORAGE
+            permissions.add(Manifest.permission.READ_EXTERNAL_STORAGE)
         }
 
-        if (ContextCompat.checkSelfPermission(this, permission) != PackageManager.PERMISSION_GRANTED) {
-            ActivityCompat.requestPermissions(this, arrayOf(permission), 123)
+        permissions.add(Manifest.permission.READ_PHONE_STATE)
+
+        val permissionsToRequest = permissions.filter {
+            ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED
+        }
+
+        if (permissionsToRequest.isNotEmpty()) {
+            ActivityCompat.requestPermissions(this, permissionsToRequest.toTypedArray(), 123)
         } else {
             loadSongs()
             startMusicService()
